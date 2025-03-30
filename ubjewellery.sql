@@ -1,0 +1,185 @@
+-- Analysing data from a jewellery store through the period of 2024.
+CREATE DATABASE IF NOT EXISTS UBJEWELLERY;
+USE UBJEWELLERY;
+CREATE TABLE jewelry_sales (
+    TransactionID VARCHAR(15) PRIMARY KEY,
+    Date DATE,
+    Time TIME,
+    ItemSold VARCHAR(20),
+    QuantitySold INT,
+    SalePrice DECIMAL(10, 2),  -- Cost
+    Weight DECIMAL(10, 2),
+    MetalType VARCHAR(20),
+    DiscountApplied DECIMAL(10, 2),
+    TotalSaleValue DECIMAL(10, 2),  -- Sale price
+    PaymentMethod VARCHAR(10),
+    CustomerID VARCHAR(15),
+    Age INT,
+    Gender VARCHAR(20),
+    SalesAssociate VARCHAR(30),
+    MarkupPrice DECIMAL(10, 2)  -- Profit
+);
+CREATE INDEX idx_jewelry_date ON jewelry_sales(Date);
+CREATE INDEX idx_jewelry_item ON jewelry_sales(ItemSold);
+CREATE INDEX idx_jewelry_metal ON jewelry_sales(MetalType);
+CREATE INDEX idx_jewelry_customer ON jewelry_sales(CustomerID);
+CREATE INDEX idx_jewelry_associate ON jewelry_sales(SalesAssociate);
+
+-- Testing data import validity on a large dataset
+SELECT 
+    COUNT(*) AS total_rows,
+    COUNT(DISTINCT TransactionID) AS unique_transactions,
+    MIN(Date) AS earliest_date,
+    MAX(Date) AS latest_date
+FROM 
+    jewelry_sales;   -- 6794 rows, 6794 unique_transactions
+
+-- Main sales data for later visualisation
+SELECT 
+    TransactionID,
+    Date,
+    Time,
+    DAYNAME(Date) AS DayOfWeek,
+    MONTHNAME(Date) AS MonthName,
+    ItemSold,
+    QuantitySold,
+    MetalType,
+    Weight,
+    SalePrice AS Cost,
+    MarkupPrice AS Profit,
+    DiscountApplied,
+    TotalSaleValue AS SalePrice,
+    (TotalSaleValue - SalePrice) / SalePrice * 100 AS ProfitMarginPercentage,
+    PaymentMethod,
+    CustomerID,
+    Age,
+    Gender,
+    SalesAssociate
+FROM 
+    jewelry_sales;
+    
+    -- Product performance analysis to see most profitable items
+    SELECT 
+    ItemSold,
+    MetalType,
+    COUNT(*) AS TransactionCount,
+    SUM(QuantitySold) AS TotalQuantitySold,
+    SUM(TotalSaleValue) AS TotalRevenue,
+    SUM(TotalSaleValue - SalePrice) AS TotalProfit,
+    AVG(Weight) AS AverageWeight,
+    AVG((TotalSaleValue - SalePrice) / SalePrice * 100) AS AverageProfitMargin
+FROM 
+    jewelry_sales
+GROUP BY 
+    ItemSold, MetalType
+ORDER BY 
+    TotalRevenue DESC;
+    
+    -- Analysing the sales by time of year and date
+    SELECT 
+    Date,
+    DAYNAME(Date) AS DayOfWeek,
+    MONTHNAME(Date) AS MonthName,
+    COUNT(*) AS TransactionCount,
+    SUM(TotalSaleValue) AS TotalRevenue,
+    SUM(TotalSaleValue - SalePrice) AS TotalProfit,
+    AVG(TotalSaleValue) AS AverageTransactionValue
+FROM 
+    jewelry_sales
+GROUP BY 
+    Date, DAYNAME(Date), MONTHNAME(Date)
+ORDER BY 
+    Date;
+    
+    -- Comparing performance between staff
+    SELECT 
+    SalesAssociate,
+    COUNT(*) AS TransactionCount,
+    SUM(TotalSaleValue) AS TotalRevenue,
+    SUM(TotalSaleValue - SalePrice) AS TotalProfit,
+    AVG((TotalSaleValue - SalePrice) / SalePrice * 100) AS AverageProfitMargin,
+    SUM(CASE WHEN MetalType LIKE '%Gold%' THEN TotalSaleValue ELSE 0 END) AS GoldSales,
+    SUM(CASE WHEN MetalType = 'Silver' THEN TotalSaleValue ELSE 0 END) AS SilverSales,
+    AVG(DiscountApplied) AS AvgDiscountAmount
+FROM 
+    jewelry_sales
+GROUP BY 
+    SalesAssociate
+ORDER BY 
+    TotalRevenue DESC;
+    
+    -- Understanding customer demographics
+    SELECT 
+    Gender,
+    CASE
+        WHEN Age < 25 THEN '18-24'
+        WHEN Age BETWEEN 25 AND 34 THEN '25-34'
+        WHEN Age BETWEEN 35 AND 44 THEN '35-44'
+        WHEN Age BETWEEN 45 AND 54 THEN '45-54'
+        WHEN Age BETWEEN 55 AND 64 THEN '55-64'
+        ELSE '65+'
+    END AS AgeGroup,
+    COUNT(*) AS TransactionCount,
+    COUNT(DISTINCT CustomerID) AS UniqueCustomers,
+    SUM(TotalSaleValue) AS TotalSpent,
+    AVG(TotalSaleValue) AS AvgTransactionValue,
+    SUM(TotalSaleValue - SalePrice) AS TotalProfit
+FROM 
+    jewelry_sales
+GROUP BY 
+    Gender, AgeGroup
+ORDER BY 
+    Gender, AgeGroup;
+    
+    -- Analysing performance of different metals
+    SELECT 
+    MetalType,
+    COUNT(*) AS TransactionCount,
+    SUM(TotalSaleValue) AS TotalRevenue,
+    SUM(TotalSaleValue - SalePrice) AS TotalProfit,
+    AVG((TotalSaleValue - SalePrice) / SalePrice * 100) AS AverageProfitMargin,
+    AVG(Weight) AS AverageWeight,
+    SUM(QuantitySold) AS TotalQuantitySold
+FROM 
+    jewelry_sales
+GROUP BY 
+    MetalType
+ORDER BY 
+    TotalRevenue DESC;
+    
+    -- Impact of payment preferences on purchases
+SELECT 
+    PaymentMethod,
+    EXTRACT(MONTH FROM Date) AS MonthNumber,
+    COUNT(*) AS TransactionCount,
+    SUM(TotalSaleValue) AS TotalRevenue,
+    AVG(TotalSaleValue) AS AvgTransactionValue,
+    SUM(CASE WHEN MetalType LIKE '%Gold%' THEN 1 ELSE 0 END) AS GoldTransactions,
+    SUM(CASE WHEN MetalType = 'Silver' THEN 1 ELSE 0 END) AS SilverTransactions
+FROM 
+    jewelry_sales
+GROUP BY 
+    PaymentMethod, EXTRACT(MONTH FROM Date)
+ORDER BY
+    EXTRACT(MONTH FROM Date), PaymentMethod;
+    
+    -- Analysing customer retention and loyalty
+    SELECT 
+    CustomerID,
+    Age,
+    Gender,
+    COUNT(*) AS PurchaseCount,
+    MIN(Date) AS FirstPurchaseDate,
+    MAX(Date) AS LastPurchaseDate,
+    DATEDIFF(MAX(Date), MIN(Date)) AS DaysBetweenFirstAndLastPurchase,
+    SUM(TotalSaleValue) AS TotalSpent,
+    AVG(TotalSaleValue) AS AvgTransactionValue
+FROM 
+    jewelry_sales
+GROUP BY 
+    CustomerID, Age, Gender
+ORDER BY 
+    TotalSpent DESC;
+
+
+  
